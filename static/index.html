@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Finder</title>
     <style>
+        /* Existing styles remain the same */
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
@@ -52,7 +53,7 @@
         button:hover {
             background-color: #2980b9;
         }
-        #result {
+        #result, #domainResult {
             margin-top: 20px;
             background-color: #fff;
             padding: 20px;
@@ -73,26 +74,83 @@
             text-align: center;
             color: #7f8c8d;
         }
+        .tab {
+            display: none;
+        }
+        .tab.active {
+            display: block;
+        }
+        .tabs {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .tabs button {
+            width: 48%;
+            padding: 10px;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .tabs button.active {
+            background-color: #2980b9;
+        }
     </style>
 </head>
 <body>
     <h1>Email Finder</h1>
-    <form id="emailForm">
-        <label for="firstName">First Name:</label>
-        <input type="text" id="firstName" required>
+    <div class="tabs">
+        <button id="emailFinderTab" class="active">Email Finder</button>
+        <button id="domainSearchTab">Domain Search</button>
+    </div>
+
+    <div id="emailFinder" class="tab active">
+        <form id="emailForm">
+            <label for="firstName">First Name:</label>
+            <input type="text" id="firstName" required>
+            
+            <label for="lastName">Last Name:</label>
+            <input type="text" id="lastName" required>
+            
+            <label for="companyWebsite">Company Website:</label>
+            <input type="text" id="companyWebsite" required>
+            
+            <button type="submit">Find Emails</button>
+        </form>
         
-        <label for="lastName">Last Name:</label>
-        <input type="text" id="lastName" required>
+        <div id="result"></div>
+    </div>
+
+    <div id="domainSearch" class="tab">
+        <form id="domainForm">
+            <label for="domainName">Domain Name:</label>
+            <input type="text" id="domainName" required>
+            
+            <button type="submit">Search Emails</button>
+        </form>
         
-        <label for="companyWebsite">Company Website:</label>
-        <input type="text" id="companyWebsite" required>
-        
-        <button type="submit">Find Emails</button>
-    </form>
-    
-    <div id="result"></div>
+        <div id="domainResult"></div>
+    </div>
 
     <script>
+        document.getElementById('emailFinderTab').addEventListener('click', function() {
+            document.getElementById('emailFinder').classList.add('active');
+            document.getElementById('domainSearch').classList.remove('active');
+            this.classList.add('active');
+            document.getElementById('domainSearchTab').classList.remove('active');
+        });
+
+        document.getElementById('domainSearchTab').addEventListener('click', function() {
+            document.getElementById('domainSearch').classList.add('active');
+            document.getElementById('emailFinder').classList.remove('active');
+            this.classList.add('active');
+            document.getElementById('emailFinderTab').classList.remove('active');
+        });
+
         document.getElementById('emailForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -131,6 +189,43 @@
             .catch((error) => {
                 console.error('Error:', error);
                 resultDiv.innerHTML = '<p>An error occurred while searching for emails.</p>';
+            });
+        });
+
+        document.getElementById('domainForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const domainName = document.getElementById('domainName').value;
+            
+            const domainResultDiv = document.getElementById('domainResult');
+            domainResultDiv.innerHTML = '<p class="loading">Searching for emails...</p>';
+            
+            fetch('/search-domain', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    domain: domainName
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.emails && data.emails.length > 0) {
+                    const emailList = data.emails.map(email => `<li>${email}</li>`).join('');
+                    domainResultDiv.innerHTML = `
+                        <h2>Found Emails:</h2>
+                        <ul class="email-list">
+                            ${emailList}
+                        </ul>
+                    `;
+                } else {
+                    domainResultDiv.innerHTML = '<p>No emails found for this domain.</p>';
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                domainResultDiv.innerHTML = '<p>An error occurred while searching for emails.</p>';
             });
         });
     </script>

@@ -26,6 +26,10 @@ type OutputData struct {
 	Emails []string `json:"emails"`
 }
 
+type DomainSearchInput struct {
+	Domain string `json:"domain"`
+}
+
 var db *sql.DB
 
 func main() {
@@ -57,6 +61,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/find-email", findEmailHandler).Methods("POST")
+	r.HandleFunc("/search-domain", searchDomainHandler).Methods("POST") // New route
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
 
 	log.Println("Server is running on http://localhost:8080")
@@ -163,6 +168,52 @@ func verifyEmailsAsync(emails []string, domain string) []string {
 
 	wg.Wait()
 	return validEmails
+}
+
+func searchDomainHandler(w http.ResponseWriter, r *http.Request) {
+	var input DomainSearchInput
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		log.Printf("Error decoding input: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received domain search input: %+v", input)
+
+	emails, err := getEmailsByDomain(input.Domain)
+	if err != nil {
+		log.Printf("Error fetching emails for domain %s: %v", input.Domain, err)
+		http.Error(w, "Error fetching emails", http.StatusInternalServerError)
+		return
+	}
+
+	if len(emails) > 0 {
+		log.Printf("Found %d emails for domain %s", len(emails), input.Domain)
+		json.NewEncoder(w).Encode(OutputData{Emails: emails})
+	} else {
+		log.Printf("No emails found for domain %s", input.Domain)
+		http.Error(w, "No emails found for the given domain", http.StatusNotFound)
+	}
+}
+
+func getEmailsByDomain(domain string) ([]string, error) {
+	rows, err := db.Query("SELECT DISTINCT email FROM email_cache WHERE company_website LIKE $1", "%"+domain+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var emails []string
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		emails = append(emails, email)
+	}
+
+	return emails, nil
 }
 
 func verifyEmail(email, domainName string) bool {
